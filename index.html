@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>演算ゲートラン | ゾンビ討伐クラウドランナー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-body: #05070a;
+    --bg-app-inner: #142018;
+    --bg-app-outer: #05070a;
+    --stage-bg: #000;
+    --ink: #0c0f0d;
+    --panel: #12211c;
+    --panel-edge: #2c4b3d;
+    --panel-bg: rgba(6,12,10,.55);
+    --panel-border: rgba(217,230,216,.18);
+    --accent-go: #35e0c8;
+    --accent-danger: #ff4d3d;
+    --paper: #d9e6d8;
+    --dim: #7b9089;
+    --vignette-color: rgba(0,0,0,.65);
+    --scanline-color: #ffffff;
+    --scrim-1: rgba(3,6,5,.78);
+    --scrim-2: rgba(3,6,5,.92);
+    --rule-border: rgba(217,230,216,.25);
+    --rule-bg: rgba(217,230,216,.04);
+    --footer-dim: rgba(217,230,216,.4);
+  }
+  html[data-theme="light"]{
+    --bg-body: #eef4ef;
+    --bg-app-inner: #ffffff;
+    --bg-app-outer: #d6e6dc;
+    --stage-bg: #cfe6d8;
+    --panel: #eef7f1;
+    --panel-edge: #a9c8ba;
+    --panel-bg: rgba(255,255,255,.68);
+    --panel-border: rgba(17,32,24,.16);
+    --accent-go: #0e9c86;
+    --accent-danger: #cf3324;
+    --paper: #17251d;
+    --dim: #52685c;
+    --vignette-color: rgba(20,40,30,.12);
+    --scanline-color: #0c1a13;
+    --scrim-1: rgba(255,255,255,.72);
+    --scrim-2: rgba(255,255,255,.88);
+    --rule-border: rgba(17,32,24,.2);
+    --rule-bg: rgba(17,32,24,.05);
+    --footer-dim: rgba(17,32,24,.45);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; height:100%; background:var(--bg-body);
+    font-family:'Oswald','Hiragino Sans','Yu Gothic',sans-serif;
+    color:var(--paper);
+    overflow:hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app{
+    height:100%; width:100%;
+    display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse at 50% 20%, var(--bg-app-inner) 0%, var(--bg-app-outer) 70%);
+    padding: 14px;
+    transition: background .25s ease;
+  }
+  #stage{
+    position:relative;
+    width: min(100%, calc((100vh - 28px) * 16 / 9));
+    height: min(100%, calc((100vw - 28px) * 9 / 16));
+    aspect-ratio: 16 / 9;
+    background:var(--stage-bg);
+    border-radius:6px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px var(--panel-edge), 0 20px 60px rgba(0,0,0,.6);
+  }
+  #game-canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor: grab; }
+  #game-canvas:active{ cursor: grabbing; }
+
+  #hud{ position:absolute; inset:0; pointer-events:none; }
+  .corner-frame::before, .corner-frame::after{ content:''; position:absolute; width:22px; height:22px; border-color: var(--panel-border); }
+
+  #hud-top{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding: 14px 18px;
+  }
+  .hud-block{
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    padding: 8px 16px;
+    backdrop-filter: blur(2px);
+  }
+  .hud-label{ font-size:10px; letter-spacing:.14em; color:var(--dim); margin:0 0 2px; }
+  .hud-value{ font-family:'Roboto Mono',monospace; font-size:26px; font-weight:700; line-height:1; color:var(--paper); }
+  #hud-value-crowd{ color:var(--accent-go); font-size:30px; }
+  .flash-pulse{ animation: pulseHit .3s ease-out; }
+  @keyframes pulseHit{ 0%{ color:var(--accent-danger); transform:scale(1.25);} 100%{ color:var(--accent-go); transform:scale(1);} }
+
+  #hit-flash{
+    position:absolute; inset:0; background:var(--accent-danger);
+    opacity:0; pointer-events:none; mix-blend-mode:screen;
+    transition: opacity .08s ease-out;
+  }
+  #vignette{ position:absolute; inset:0; pointer-events:none;
+    box-shadow: inset 0 0 140px var(--vignette-color);
+  }
+  #scanline{ position:absolute; inset:0; pointer-events:none; opacity:.05;
+    background: repeating-linear-gradient(180deg, var(--scanline-color) 0px, var(--scanline-color) 1px, transparent 2px, transparent 3px);
+  }
+
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:16px;
+    background: linear-gradient(180deg, var(--scrim-1), var(--scrim-2));
+    pointer-events:auto;
+    padding: 24px;
+  }
+  .screen.hidden{ display:none; }
+  .title-main{
+    font-size: clamp(28px, 6vw, 52px);
+    font-weight:700; letter-spacing:.03em; margin:0;
+    color:var(--paper);
+    text-shadow: 0 0 24px rgba(53,224,200,.35);
+  }
+  .title-sub{
+    font-family:'Roboto Mono',monospace;
+    font-size: clamp(10px, 1.6vw, 13px);
+    letter-spacing:.2em; color:var(--accent-go); margin:0;
+  }
+  .rule-box{
+    border:1px solid var(--rule-border);
+    padding: 12px 18px; max-width: 420px;
+    font-size: clamp(11px, 1.8vw, 13px); line-height:1.9; color:var(--dim);
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    background: var(--rule-bg);
+  }
+  .rule-box b{ color:var(--paper); font-weight:500; }
+  .btn{
+    font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.08em;
+    font-size: clamp(14px, 2.2vw, 17px);
+    color:#04120e; background:var(--accent-go);
+    border:none; padding: 13px 40px; cursor:pointer;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{ filter:brightness(1.1); transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); filter:brightness(.95); }
+  .result-row{ display:flex; gap:28px; }
+  .result-item .hud-label{ text-align:center; }
+  .result-item .hud-value{ font-size:34px; text-align:center; }
+  #app-footer-hint{
+    position:absolute; bottom:10px; left:0; right:0; text-align:center;
+    font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.1em; color:var(--footer-dim);
+    pointer-events:none;
+  }
+  .theme-toggle{
+    position:absolute; bottom:10px; right:14px; z-index:20;
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; line-height:1;
+    background: var(--panel-bg); border:1px solid var(--panel-border); color:var(--paper);
+    cursor:pointer; pointer-events:auto;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .theme-toggle:hover{ filter:brightness(1.15); transform:scale(1.06); }
+  .theme-toggle:active{ transform:scale(.94); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game-canvas"></canvas>
+
+    <div id="hud">
+      <div id="hud-top">
+        <div class="hud-block">
+          <p class="hud-label">CROWD</p>
+          <p class="hud-value" id="hud-value-crowd">5</p>
+        </div>
+        <div class="hud-block">
+          <p class="hud-label">DISTANCE</p>
+          <p class="hud-value" id="hud-value-distance">0<span style="font-size:14px;color:var(--dim);"> m</span></p>
+        </div>
+      </div>
+      <div id="vignette"></div>
+      <div id="scanline"></div>
+    </div>
+
+    <div id="hit-flash"></div>
+
+    <div class="screen" id="start-screen">
+      <p class="title-sub">CALCULATE &amp; SURVIVE</p>
+      <h1 class="title-main">演算ゲートラン</h1>
+      <div class="rule-box">
+        <b>ドラッグ / ←→キー</b>で部隊を左右移動。<br>
+        <b>青ゲート</b>は人数増加、<b>赤ゲート</b>は減少。一瞬で計算して進路を選べ。<br>
+        障害物とゾンビは自動射撃で掃討、倒しきれず激突すると人数を失う。<br>
+        人数が0になったら全滅、そこまでの到達距離を競おう。
+      </div>
+      <button class="btn" id="btn-start">出撃する</button>
+    </div>
+
+    <div class="screen hidden" id="gameover-screen">
+      <p class="title-sub" style="color:var(--accent-danger);">CROWD ANNIHILATED</p>
+      <h1 class="title-main">全滅...</h1>
+      <div class="result-row">
+        <div class="result-item">
+          <p class="hud-label">到達距離</p>
+          <p class="hud-value" id="final-distance">0 m</p>
+        </div>
+        <div class="result-item">
+          <p class="hud-label">最大人数</p>
+          <p class="hud-value" id="final-peak">0</p>
+        </div>
+      </div>
+      <button class="btn" id="btn-retry">もう一度出撃</button>
+    </div>
+
+    <div id="app-footer-hint">DRAG / ARROW KEYS TO MOVE</div>
+    <button id="btn-theme" class="theme-toggle" type="button" title="ライト/ダークモード切り替え">🌙</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+(function(){
+
+  /* =========================================================
+     設定
+  ========================================================= */
+  const CONFIG = {
+    laneHalfWidth: 3.4,
+    startCrowd: 5,
+    baseSpeed: 7.6,
+    maxSpeed: 15.5,
+    speedRampPerMeter: 0.012,
+    engagementRange: 15,
+    damagePerSoldier: 1.55,
+    maxRenderedSoldiers: 140,   // unlimitedCrowdDisplay=false の場合に使う初期表示上限
+    unlimitedCrowdDisplay: true, // trueの場合、人数の増加に合わせて3D表示するインスタンス数を自動で増やし、表示上の人数制限を実質なくす
+    soldierDisplayHardCap: 4000, // ブラウザが重くなりすぎないための安全上の上限(実質的な人数上限ではなく描画数の保険)
+    spawnGapMin: 12,
+    spawnGapMax: 18,
+    spawnFarZ: -130,
+    removeZ: 6,
+    dragSensitivityFactor: 1.5,
+    keyMoveSpeed: 9.5,
+  };
+
+  const COLOR = {
+    sky: 0x0b1b16,
+    fogNear: 22,
+    fogFar: 118,
+    ground: 0x14261f,
+    good: 0x35e0c8,
+    bad: 0xff4d3d,
+  };
+
+  /* =========================================================
+     DOM
+  ========================================================= */
+  const stageEl = document.getElementById('stage');
+  const canvas = document.getElementById('game-canvas');
+  const hudCrowdEl = document.getElementById('hud-value-crowd');
+  const hudDistEl = document.getElementById('hud-value-distance');
+  const hitFlashEl = document.getElementById('hit-flash');
+  const startScreen = document.getElementById('start-screen');
+  const gameoverScreen = document.getElementById('gameover-screen');
+  const btnStart = document.getElementById('btn-start');
+  const btnRetry = document.getElementById('btn-retry');
+  const finalDistanceEl = document.getElementById('final-distance');
+  const finalPeakEl = document.getElementById('final-peak');
+  const btnTheme = document.getElementById('btn-theme');
+
+  /* =========================================================
+     Three.js 基本セットアップ
+  ========================================================= */
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0d1c17, COLOR.fogNear, COLOR.fogFar);
+
+  const camera = new THREE.PerspectiveCamera(58, 16/9, 0.1, 300);
+  camera.position.set(0, 5.4, 9.2);
+  camera.lookAt(0, 1.4, -9);
+
+  // --- ライト/ダークモード用の3Dパレット定義 ---
+  const THEME_3D = {
+    dark:{
+      skyTop:0x1c3a3a, skyBottom:0x0d1c17, fog:0x0d1c17,
+      ambient:0x8fb0a6, ambientIntensity:0.75,
+      sun:0xfff2d9, sunIntensity:0.9,
+      rim:0x3ad6c2, rimIntensity:0.35,
+      groundFill:'#16281f', groundCenterLine:'rgba(217,230,216,.5)', groundEdgeLine:'rgba(53,224,200,.35)',
+    },
+    light:{
+      skyTop:0x8fd4ea, skyBottom:0xe3f4e8, fog:0xe3f4e8,
+      ambient:0xffffff, ambientIntensity:0.95,
+      sun:0xfff7e0, sunIntensity:1.2,
+      rim:0x5cc2b0, rimIntensity:0.25,
+    },
+  };
+  let currentTheme = 'dark';
+
+  // --- スカイドーム(グラデーション空) ---
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms:{
+      topColor:{ value:new THREE.Color(THEME_3D.dark.skyTop) },
+      bottomColor:{ value:new THREE.Color(THEME_3D.dark.skyBottom) },
+      offset:{ value: 18 },
+      exponent:{ value: 0.65 },
+    },
+    vertexShader:`
+      varying vec3 vWorldPosition;
+      void main(){
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }`,
+    fragmentShader:`
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      uniform float offset;
+      uniform float exponent;
+      varying vec3 vWorldPosition;
+      void main(){
+        float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h,0.0), exponent), 0.0)), 1.0);
+      }`,
+    side: THREE.BackSide,
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(260, 24, 16), skyMat));
+
+  // --- ライト ---
+  const ambientLight = new THREE.AmbientLight(THEME_3D.dark.ambient, THEME_3D.dark.ambientIntensity);
+  scene.add(ambientLight);
+  const sun = new THREE.DirectionalLight(THEME_3D.dark.sun, THEME_3D.dark.sunIntensity);
+  sun.position.set(-6, 14, 6);
+  scene.add(sun);
+  const rim = new THREE.DirectionalLight(THEME_3D.dark.rim, THEME_3D.dark.rimIntensity);
+  rim.position.set(4, 6, -10);
+  scene.add(rim);
+
+  // --- 地面(スクロール風テクスチャ) ---
+  let groundTexture;
+  const groundCanvas = document.createElement('canvas');
+  groundCanvas.width = 128; groundCanvas.height = 256;
+  const groundCtx = groundCanvas.getContext('2d');
+  function drawGroundTexture(theme){
+    const c = groundCanvas, ctx = groundCtx;
+    ctx.fillStyle = theme.groundFill;
+    ctx.fillRect(0,0,c.width,c.height);
+    ctx.strokeStyle = theme.groundCenterLine;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([26, 22]);
+    ctx.beginPath(); ctx.moveTo(c.width/2, 0); ctx.lineTo(c.width/2, c.height); ctx.stroke();
+    ctx.strokeStyle = theme.groundEdgeLine;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(10, c.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(c.width-10, 0); ctx.lineTo(c.width-10, c.height); ctx.stroke();
+    if(groundTexture) groundTexture.needsUpdate = true;
+  }
+  drawGroundTexture(THEME_3D.dark);
+  const ground = (function(){
+    groundTexture = new THREE.CanvasTexture(groundCanvas);
+    groundTexture.wrapS = THREE.RepeatWrapping;
+    groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(1, 46);
+    const geo = new THREE.PlaneGeometry(CONFIG.laneHalfWidth*2 + 1.4, 320);
+    const mat = new THREE.MeshStandardMaterial({ map: groundTexture, color: 0xffffff, roughness:1 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI/2;
+    mesh.position.set(0, 0, -110);
+    scene.add(mesh);
+    return mesh;
+  })();
+
+  // --- テーマ切り替え本体 ---
+  function applyTheme(themeName){
+    const theme = THEME_3D[themeName] || THEME_3D.dark;
+    currentTheme = themeName;
+    document.documentElement.setAttribute('data-theme', themeName);
+    skyMat.uniforms.topColor.value.set(theme.skyTop);
+    skyMat.uniforms.bottomColor.value.set(theme.skyBottom);
+    scene.fog.color.set(theme.fog);
+    ambientLight.color.set(theme.ambient);
+    ambientLight.intensity = theme.ambientIntensity;
+    sun.color.set(theme.sun);
+    sun.intensity = theme.sunIntensity;
+    rim.color.set(theme.rim);
+    rim.intensity = theme.rimIntensity;
+    windowLitMat.emissiveIntensity = themeName==='dark' ? 1.2 : 0;
+    // 道路の色は切り替えず、常に元の見た目のまま固定する
+    btnTheme.textContent = themeName==='dark' ? '🌙' : '☀️';
+  }
+  btnTheme.addEventListener('click', ()=>{
+    applyTheme(currentTheme==='dark' ? 'light' : 'dark');
+  });
+
+  // ガードレール(視覚的なレーン端)
+  [-1, 1].forEach(side=>{
+    const geo = new THREE.BoxGeometry(0.14, 0.5, 320);
+    const mat = new THREE.MeshStandardMaterial({ color:0x203832, emissive:0x0d1c17 });
+    const rail = new THREE.Mesh(geo, mat);
+    rail.position.set(side*(CONFIG.laneHalfWidth+0.55), 0.2, -110);
+    scene.add(rail);
+  });
+
+  /* =========================================================
+     テキスト/スプライト ユーティリティ
+  ========================================================= */
+  function makeDynamicLabel(text, opts){
+    opts = opts||{};
+    const size = opts.size||60;
+    const color = opts.color||'#ffffff';
+    const stroke = opts.stroke||'#04120e';
+    const cw = opts.cw||220, ch = opts.ch||110;
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const ctx = c.getContext('2d');
+    function draw(t){
+      ctx.clearRect(0,0,cw,ch);
+      ctx.font = `700 ${size}px Oswald, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = size*0.16;
+      ctx.strokeStyle = stroke;
+      ctx.strokeText(t, cw/2, ch/2);
+      ctx.fillStyle = color;
+      ctx.fillText(t, cw/2, ch/2);
+    }
+    draw(text);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent:true, depthWrite:false });
+    const sprite = new THREE.Sprite(mat);
+    const scale = opts.scale||0.011;
+    sprite.scale.set(cw*scale, ch*scale, 1);
+    return {
+      sprite,
+      setText(t){ draw(String(t)); tex.needsUpdate = true; },
+      setColor(col){ mat.opacity = 1; color = col; },
+    };
+  }
+
+  function spawnFloatingText(text, x, y, z, color){
+    const label = makeDynamicLabel(text, { size:70, color, cw:200, ch:100, scale:0.017 });
+    label.sprite.position.set(x, y, z);
+    scene.add(label.sprite);
+    floatingTexts.push({ sprite:label.sprite, mat:label.sprite.material, life:1.0 });
+  }
+
+  /* =========================================================
+     プレイヤー(クラウド)
+  ========================================================= */
+  const playerGroup = new THREE.Group();
+  playerGroup.position.set(0, 0, 0);
+  scene.add(playerGroup);
+
+  const bodyGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.62, 7);
+  const headGeo = new THREE.SphereGeometry(0.15, 8, 7);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2f8f6f, roughness:.6 });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xd9b98d, roughness:.7 });
+  let soldierCapacity = CONFIG.maxRenderedSoldiers;
+  let bodyMesh = new THREE.InstancedMesh(bodyGeo, bodyMat, soldierCapacity);
+  let headMesh = new THREE.InstancedMesh(headGeo, headMat, soldierCapacity);
+  bodyMesh.count = 0; headMesh.count = 0;
+  playerGroup.add(bodyMesh, headMesh);
+
+  // 表示に必要なインスタンス数が現在の容量を超えたら、より大きな容量で作り直す(表示上限を実質撤廃)
+  function ensureSoldierCapacity(required){
+    if(required <= soldierCapacity) return;
+    const hardCap = CONFIG.soldierDisplayHardCap;
+    const newCapacity = Math.min(hardCap, Math.max(required, soldierCapacity*2));
+    playerGroup.remove(bodyMesh, headMesh);
+    bodyMesh = new THREE.InstancedMesh(bodyGeo, bodyMat, newCapacity);
+    headMesh = new THREE.InstancedMesh(headGeo, headMat, newCapacity);
+    bodyMesh.count = 0; headMesh.count = 0;
+    playerGroup.add(bodyMesh, headMesh);
+    soldierCapacity = newCapacity;
+  }
+
+  let formationOffsets = [];
+  let playerFormationHalfWidth = 0.3;
+  function rebuildFormation(renderCount){
+    const baseSpacing = 0.46;
+    const densityThreshold = 1000;
+    // 1000人を超えたら、増えた分だけ間隔を詰めて密度を上げる(奥行きが際限なく伸びるのを防ぐ)
+    let spacing = baseSpacing;
+    if(renderCount > densityThreshold){
+      const excessRatio = renderCount / densityThreshold;
+      spacing = Math.max(0.2, baseSpacing / Math.sqrt(excessRatio));
+    }
+    // 列数はレーン幅に収まる範囲で抑え、それ以上は奥行き方向(行数)に伸ばす
+    const maxCols = Math.max(3, Math.floor((CONFIG.laneHalfWidth*2 - 0.6) / spacing));
+    const desiredCols = Math.max(1, Math.ceil(Math.sqrt(renderCount)));
+    const cols = Math.min(desiredCols, maxCols);
+    const rows = Math.max(1, Math.ceil(renderCount/cols));
+    formationOffsets = [];
+    for(let i=0;i<renderCount;i++){
+      const col = i % cols, row = Math.floor(i/cols);
+      const x = (col - (cols-1)/2) * spacing;
+      const z = (row - (rows-1)/2) * spacing * 0.9;
+      formationOffsets.push({x, z});
+    }
+    // 見た目の隊列の実際の横幅(左右の兵士の中心+兵士1体分の半径)を当たり判定にそのまま使う
+    const soldierRadius = 0.22;
+    playerFormationHalfWidth = renderCount>0 ? ((cols-1)/2)*spacing + soldierRadius : soldierRadius;
+  }
+
+  const dummy = new THREE.Object3D();
+  function updateSoldierInstances(t){
+    const displayCap = CONFIG.unlimitedCrowdDisplay ? CONFIG.soldierDisplayHardCap : CONFIG.maxRenderedSoldiers;
+    const renderCount = Math.min(crowdCount, displayCap);
+    if(CONFIG.unlimitedCrowdDisplay) ensureSoldierCapacity(renderCount);
+    if(renderCount !== bodyMesh.count){
+      rebuildFormation(renderCount);
+      bodyMesh.count = renderCount;
+      headMesh.count = renderCount;
+    }
+    for(let i=0;i<renderCount;i++){
+      const off = formationOffsets[i];
+      const bounce = Math.sin(t*8 + i*0.7) * 0.05 + 0.05;
+      dummy.position.set(off.x, 0.34 + bounce, off.z);
+      dummy.rotation.set(0,0,0);
+      dummy.scale.set(1,1,1);
+      dummy.updateMatrix();
+      bodyMesh.setMatrixAt(i, dummy.matrix);
+      dummy.position.set(off.x, 0.72 + bounce, off.z);
+      dummy.updateMatrix();
+      headMesh.setMatrixAt(i, dummy.matrix);
+    }
+    if(renderCount>0){
+      bodyMesh.instanceMatrix.needsUpdate = true;
+      headMesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /* =========================================================
+     ワールド生成(ゲート / 障害物 / ゾンビ / 装飾)
+  ========================================================= */
+  const worldObjects = []; // {group, kind, ...}
+  const floatingTexts = [];
+
+  function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function randRange(min,max){ return Math.random()*(max-min)+min; }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function difficultyFactor(){ return 1 + distance/380; }
+  // 障害物は距離が進むほどHPがより急激に上がるようにする(通常の難易度係数より急勾配+後半で加速)
+  function obstacleDifficultyFactor(){ return 1 + distance/130 + Math.pow(distance/700, 2); }
+
+  // ---- 演算ゲート ----
+  function makeOp(positive){
+    if(positive){
+      const r = Math.random();
+      if(r<0.55) return { type:'add', value: randInt(8, 26) };
+      if(r<0.85) return { type:'mul', value: 2 };
+      return { type:'mul', value: 3 };
+    } else {
+      const r = Math.random();
+      if(r<0.6) return { type:'sub', value: randInt(8, 26) };
+      if(r<0.85) return { type:'div', value: 2 };
+      return { type:'div', value: 3 };
+    }
+  }
+  function opLabel(op){
+    switch(op.type){
+      case 'add': return `+${op.value}`;
+      case 'sub': return `-${op.value}`;
+      case 'mul': return `×${op.value}`;
+      case 'div': return `÷${op.value}`;
+    }
+  }
+  function applyOp(op, crowd){
+    switch(op.type){
+      case 'add': return crowd + op.value;
+      case 'sub': return Math.max(0, crowd - op.value);
+      case 'mul': return Math.round(crowd * op.value);
+      case 'div': return Math.max(0, Math.floor(crowd / op.value));
+    }
+  }
+  function isPositiveOp(op){ return op.type==='add' || op.type==='mul'; }
+
+  function spawnGate(z){
+    const nSeg = Math.random()<0.55 ? 2 : 3;
+    const totalWidth = CONFIG.laneHalfWidth*2;
+    const segWidth = totalWidth/nSeg;
+    const posIndex = randInt(0, nSeg-1);
+    const group = new THREE.Group();
+    group.position.set(0,0,z);
+    const segData = [];
+    for(let i=0;i<nSeg;i++){
+      const op = makeOp(i===posIndex ? true : Math.random()<0.5);
+      const centerX = -CONFIG.laneHalfWidth + segWidth*(i+0.5);
+      const color = isPositiveOp(op) ? COLOR.good : COLOR.bad;
+      const geo = new THREE.BoxGeometry(segWidth*0.84, 3.1, 0.28);
+      const mat = new THREE.MeshStandardMaterial({
+        color, transparent:true, opacity:0.32, emissive:color, emissiveIntensity:0.55,
+        side:THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(centerX, 1.58, 0);
+      group.add(mesh);
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:0.55 })
+      );
+      edge.position.copy(mesh.position);
+      group.add(edge);
+      const label = makeDynamicLabel(opLabel(op), { size:60, color:'#f4fff9', cw:200, ch:100, scale:0.014 });
+      label.sprite.position.set(centerX, 2.55, 0.25);
+      group.add(label.sprite);
+      segData.push({ xMin: centerX-segWidth/2, xMax: centerX+segWidth/2, op });
+    }
+    scene.add(group);
+    worldObjects.push({ group, kind:'gate', segData, resolved:false });
+  }
+
+  // ---- 障害物 ----
+  function spawnObstacle(z){
+    const isBarrel = Math.random()<0.5;
+    const df = obstacleDifficultyFactor();
+    const hp = Math.round(randRange(14,24) * df);
+    const x = randRange(-(CONFIG.laneHalfWidth-0.8), CONFIG.laneHalfWidth-0.8);
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    let mesh, hitHalfWidth;
+    if(isBarrel){
+      const radius = 0.58;
+      mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.52, radius, 1.25, 12),
+        new THREE.MeshStandardMaterial({ color:0xaa4a2a, roughness:.7 })
+      );
+      mesh.position.y = 0.62;
+      hitHalfWidth = radius; // 見た目の円柱半径そのまま
+    } else {
+      const boxWidth = 1.3;
+      mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(boxWidth,1.3,1.3),
+        new THREE.MeshStandardMaterial({ color:0x8a6a45, roughness:.8 })
+      );
+      mesh.position.y = 0.65;
+      hitHalfWidth = boxWidth/2; // 見た目の箱の半幅そのまま
+    }
+    group.add(mesh);
+    const label = makeDynamicLabel(String(hp), { size:58, color:'#ffe08a', cw:150, ch:90, scale:0.012 });
+    label.sprite.position.set(0, 1.9, 0);
+    group.add(label.sprite);
+    scene.add(group);
+    worldObjects.push({ group, kind:'obstacle', mesh, label, hp, maxHp:hp, destroyed:false, resolved:false, hitHalfWidth });
+  }
+
+  // ---- ゾンビ ----
+  function buildZombieMesh(kind){
+    const group = new THREE.Group();
+    const scale = kind==='elite' ? 2.0 : 1.0;
+    const bodyColor = kind==='elite' ? 0x5a3a3a : (kind==='chaser' ? 0xb35a1e : 0x4a6a3f);
+    const bodyWidth = 0.62*scale;
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(bodyWidth, 1.15*scale, 0.42*scale),
+      new THREE.MeshStandardMaterial({ color:bodyColor, roughness:.75, emissive: kind==='chaser'?0x552200:0x000000, emissiveIntensity:.4 })
+    );
+    body.position.y = 0.62*scale;
+    const headRadius = 0.24*scale;
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(headRadius, 8, 7),
+      new THREE.MeshStandardMaterial({ color:0x6a8a5a, roughness:.8 })
+    );
+    head.position.y = 1.35*scale;
+    group.add(body, head);
+    // 見た目の実寸(胴体幅と頭の半径の大きい方)をそのまま当たり判定幅として返す
+    const hitHalfWidth = Math.max(bodyWidth/2, headRadius);
+    return { group, hitHalfWidth };
+  }
+  function spawnZombie(z, kindOverride){
+    const df = difficultyFactor();
+    const roll = Math.random();
+    const kind = kindOverride || (roll<0.12 ? 'elite' : (roll<0.4 ? 'chaser' : 'normal'));
+    let hp;
+    if(kind==='elite') hp = Math.round(randRange(140,200) * df);
+    else if(kind==='chaser') hp = Math.round(randRange(18,32) * df);
+    else hp = Math.round(randRange(10,22) * df);
+    const x = randRange(-(CONFIG.laneHalfWidth-0.7), CONFIG.laneHalfWidth-0.7);
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    const built = buildZombieMesh(kind);
+    const mesh = built.group;
+    const hitHalfWidth = built.hitHalfWidth;
+    group.add(mesh);
+    const labelY = kind==='elite' ? 3.1 : 1.85;
+    const label = makeDynamicLabel(String(hp), { size:58, color: kind==='elite' ? '#ff8a6a' : '#c8ffcf', cw:150, ch:90, scale: kind==='elite'?0.016:0.012 });
+    label.sprite.position.set(0, labelY, 0);
+    group.add(label.sprite);
+    scene.add(group);
+    worldObjects.push({ group, kind:'zombie', ztype:kind, mesh, label, hp, maxHp:hp, destroyed:false, resolved:false, hitHalfWidth });
+  }
+
+  // ---- 装飾(廃墟の建物) ----
+  // 建物の窓(ダークモード時は室内灯で光る/ライトモードでは光らない)
+  const windowGeo = new THREE.PlaneGeometry(0.32, 0.42);
+  const windowLitMat = new THREE.MeshStandardMaterial({
+    color:0x1a1a1a, emissive:0xffd98a, emissiveIntensity: currentTheme==='dark' ? 1.2 : 0, roughness:.6,
+  });
+  const windowDarkMat = new THREE.MeshStandardMaterial({ color:0x10161f, roughness:.85 });
+
+  function spawnScenery(z){
+    [-1,1].forEach(side=>{
+      if(Math.random()<0.15) return;
+      const h = randRange(3,9);
+      const w = randRange(2,4.4);
+      const x = side * randRange(6, 11);
+      const group = new THREE.Group();
+      group.position.set(x, 0, z + randRange(-6,6));
+
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, w*0.8),
+        new THREE.MeshStandardMaterial({ color: 0x152521, roughness:1 })
+      );
+      box.position.y = h/2;
+      group.add(box);
+
+      // 道路(中央)側を向く面に窓を並べる
+      const faceX = -side * (w/2 + 0.02);
+      const faceRotY = -side * Math.PI/2;
+      const cols = 2;
+      const rowSpacing = 1.4;
+      const rows = Math.min(5, Math.max(1, Math.floor((h-0.8)/rowSpacing)));
+      const colSpacing = (w*0.8) / (cols+1);
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          const lit = Math.random()<0.55;
+          const win = new THREE.Mesh(windowGeo, lit ? windowLitMat : windowDarkMat);
+          win.position.set(faceX, 0.8 + r*rowSpacing, -(w*0.8)/2 + colSpacing*(c+1));
+          win.rotation.y = faceRotY;
+          group.add(win);
+        }
+      }
+
+      scene.add(group);
+      worldObjects.push({ group, kind:'scenery' });
+    });
+  }
+
+  /* =========================================================
+     入力(ドラッグ / キーボード)
+  ========================================================= */
+  let playerX = 0, targetX = 0;
+  let isDragging = false, dragStartClientX = 0, dragStartX = 0;
+  let keyLeft = false, keyRight = false;
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    isDragging = true;
+    dragStartClientX = e.clientX;
+    dragStartX = targetX;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const sensitivity = (CONFIG.laneHalfWidth*2*CONFIG.dragSensitivityFactor) / rect.width;
+    targetX = clamp(dragStartX + (e.clientX - dragStartClientX)*sensitivity, -CONFIG.laneHalfWidth, CONFIG.laneHalfWidth);
+  });
+  window.addEventListener('pointerup', ()=>{ isDragging = false; });
+  window.addEventListener('keydown', (e)=>{
+    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') keyLeft = true;
+    if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') keyRight = true;
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') keyLeft = false;
+    if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') keyRight = false;
+  });
+
+  /* =========================================================
+     ゲーム状態
+  ========================================================= */
+  let gameState = 'ready'; // ready | playing | gameover
+  let crowdCount = CONFIG.startCrowd;
+  let peakCrowd = CONFIG.startCrowd;
+  let distance = 0;
+  let speed = CONFIG.baseSpeed;
+  let spawnTimer = 1.2;
+  let sceneryTimer = 0;
+  let shakeIntensity = 0;
+  let hitFlashTimer = 0;
+
+  function resetGame(){
+    // ワールドオブジェクトを全撤去
+    worldObjects.forEach(o=>{ scene.remove(o.group); });
+    worldObjects.length = 0;
+    floatingTexts.forEach(f=>scene.remove(f.sprite));
+    floatingTexts.length = 0;
+
+    crowdCount = CONFIG.startCrowd;
+    peakCrowd = CONFIG.startCrowd;
+    distance = 0;
+    speed = CONFIG.baseSpeed;
+    spawnTimer = 1.2;
+    sceneryTimer = 0;
+    playerX = 0; targetX = 0;
+    shakeIntensity = 0;
+    hitFlashTimer = 0;
+    updateHud(true);
+  }
+
+  function startGame(){
+    resetGame();
+    gameState = 'playing';
+    startScreen.classList.add('hidden');
+    gameoverScreen.classList.add('hidden');
+  }
+
+  function triggerGameOver(){
+    gameState = 'gameover';
+    finalDistanceEl.textContent = `${Math.floor(distance)} m`;
+    finalPeakEl.textContent = `${peakCrowd}`;
+    gameoverScreen.classList.remove('hidden');
+  }
+
+  function hitFeedback(){
+    shakeIntensity = 0.35;
+    hitFlashTimer = 0.18;
+  }
+
+  btnStart.addEventListener('click', startGame);
+  btnRetry.addEventListener('click', startGame);
+
+  /* =========================================================
+     HUD更新
+  ========================================================= */
+  let lastHudCrowd = -1;
+  function updateHud(force){
+    if(force || crowdCount !== lastHudCrowd){
+      hudCrowdEl.textContent = crowdCount;
+      lastHudCrowd = crowdCount;
+    }
+    hudDistEl.innerHTML = `${Math.floor(distance)}<span style="font-size:14px;color:var(--dim);"> m</span>`;
+  }
+
+  /* =========================================================
+     メインアップデート
+  ========================================================= */
+  const clock = new THREE.Clock();
+
+  function updateGate(entry, dt){
+    const ahead = -entry.group.position.z;
+    if(!entry.resolved && ahead<=0.15){
+      entry.resolved = true;
+      const seg = entry.segData.find(s=>playerX>=s.xMin && playerX<=s.xMax) || entry.segData[0];
+      const before = crowdCount;
+      crowdCount = applyOp(seg.op, crowdCount);
+      peakCrowd = Math.max(peakCrowd, crowdCount);
+      const delta = crowdCount - before;
+      spawnFloatingText(opLabel(seg.op), playerX, 2.2, 0.5, isPositiveOp(seg.op) ? '#35e0c8' : '#ff4d3d');
+      if(crowdCount<=0){ crowdCount = 0; triggerGameOver(); }
+    }
+  }
+
+  function updateThreat(entry, dt){
+    const ahead = -entry.group.position.z;
+    if(entry.destroyed || entry.resolved) return;
+
+    if(entry.kind==='zombie' && entry.ztype==='chaser'){
+      const easedX = entry.group.position.x + (playerX - entry.group.position.x) * Math.min(1, dt*1.6);
+      entry.group.position.x = clamp(easedX, -CONFIG.laneHalfWidth, CONFIG.laneHalfWidth);
+    }
+
+    // プレイヤーのレーン位置と重なっている(=撃てる/ぶつかる)かどうか
+    const aligned = Math.abs(playerX - entry.group.position.x) <= (entry.hitHalfWidth + playerFormationHalfWidth);
+
+    // 重なっている間だけ自動射撃でダメージを与える。重なっていなければダメージ無し。
+    if(aligned && ahead>0 && ahead<CONFIG.engagementRange){
+      const dps = crowdCount * CONFIG.damagePerSoldier;
+      entry.hp -= dps*dt;
+      if(entry.hp<=0){
+        entry.destroyed = true;
+        entry.mesh.visible = false;
+        entry.label.sprite.visible = false;
+        if(Math.random()<0.22){
+          const bonus = randInt(2, 6);
+          crowdCount += bonus;
+          peakCrowd = Math.max(peakCrowd, crowdCount);
+          spawnFloatingText(`+${bonus}`, entry.group.position.x, 1.6, entry.group.position.z, '#35e0c8');
+        }
+        return;
+      } else {
+        entry.label.setText(Math.max(0, Math.ceil(entry.hp)));
+      }
+    }
+
+    // プレイヤーの位置まで到達した時点で、重なっていれば激突ダメージ、重なっていなければ何もせず素通り
+    if(ahead<=0.1){
+      entry.resolved = true;
+      if(aligned){
+        const loss = Math.max(0, Math.ceil(entry.hp));
+        crowdCount = Math.max(0, crowdCount - loss);
+        entry.destroyed = true;
+        entry.mesh.visible = false;
+        entry.label.sprite.visible = false;
+        spawnFloatingText(`-${loss}`, playerX, 1.9, 0.5, '#ff4d3d');
+        hitFeedback();
+        if(crowdCount<=0){ triggerGameOver(); }
+      }
+    }
+  }
+
+  function update(dt, t){
+    // --- 入力によるプレイヤー移動 ---
+    if(keyLeft) targetX = clamp(targetX - CONFIG.keyMoveSpeed*dt, -CONFIG.laneHalfWidth, CONFIG.laneHalfWidth);
+    if(keyRight) targetX = clamp(targetX + CONFIG.keyMoveSpeed*dt, -CONFIG.laneHalfWidth, CONFIG.laneHalfWidth);
+    playerX += (targetX - playerX) * Math.min(1, dt*9);
+    playerGroup.position.x = playerX;
+
+    if(gameState==='playing'){
+      speed = Math.min(CONFIG.maxSpeed, CONFIG.baseSpeed + distance*CONFIG.speedRampPerMeter);
+      distance += speed*dt;
+
+      // 地面のスクロール演出
+      groundTexture.offset.y -= speed*dt*0.09;
+
+      // スポーン
+      spawnTimer -= dt;
+      if(spawnTimer<=0){
+        const roll = Math.random();
+        if(roll<0.38) spawnGate(CONFIG.spawnFarZ);
+        else if(roll<0.68) spawnObstacle(CONFIG.spawnFarZ);
+        else spawnZombie(CONFIG.spawnFarZ);
+        spawnTimer = randRange(CONFIG.spawnGapMin, CONFIG.spawnGapMax) / speed;
+      }
+      sceneryTimer -= dt;
+      if(sceneryTimer<=0){
+        spawnScenery(CONFIG.spawnFarZ - 10);
+        sceneryTimer = randRange(1.6, 2.6);
+      }
+
+      // ワールドオブジェクト移動・判定
+      for(let i=worldObjects.length-1; i>=0; i--){
+        const entry = worldObjects[i];
+        entry.group.position.z += speed*dt;
+        if(entry.kind==='gate') updateGate(entry, dt);
+        else if(entry.kind==='obstacle' || entry.kind==='zombie') updateThreat(entry, dt);
+
+        if(entry.group.position.z > CONFIG.removeZ){
+          scene.remove(entry.group);
+          worldObjects.splice(i,1);
+        }
+      }
+    }
+
+    // フローティングテキスト
+    for(let i=floatingTexts.length-1;i>=0;i--){
+      const f = floatingTexts[i];
+      f.sprite.position.y += dt*1.4;
+      f.life -= dt*1.3;
+      f.mat.opacity = Math.max(0, f.life);
+      if(f.life<=0){ scene.remove(f.sprite); floatingTexts.splice(i,1); }
+    }
+
+    // ヒットフィードバック
+    if(shakeIntensity>0) shakeIntensity = Math.max(0, shakeIntensity - dt*1.6);
+    if(hitFlashTimer>0){
+      hitFlashTimer -= dt;
+      hitFlashEl.style.opacity = Math.max(0, hitFlashTimer/0.18*0.45);
+    } else {
+      hitFlashEl.style.opacity = 0;
+    }
+
+    // カメラ
+    const camFollowX = playerX*0.35;
+    const shakeX = (Math.random()-0.5)*shakeIntensity;
+    const shakeY = (Math.random()-0.5)*shakeIntensity;
+    camera.position.x += (camFollowX - camera.position.x)*Math.min(1, dt*4) + shakeX*0.1;
+    camera.position.y = 5.4 + shakeY*0.1;
+    camera.lookAt(playerX*0.5, 1.3, -9);
+
+    updateSoldierInstances(t);
+    updateHud(false);
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+    update(dt, t);
+    renderer.render(scene, camera);
+  }
+
+  /* =========================================================
+     リサイズ
+  ========================================================= */
+  function onResize(){
+    const w = stageEl.clientWidth, h = stageEl.clientHeight;
+    if(w===0||h===0) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w/h;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(onResize).observe(stageEl);
+  onResize();
+
+  updateSoldierInstances(0);
+  updateHud(true);
+  animate();
+
+})();
+</script>
+</body>
+</html>
