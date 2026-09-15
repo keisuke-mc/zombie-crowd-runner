@@ -565,8 +565,8 @@
   function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
   function randRange(min,max){ return Math.random()*(max-min)+min; }
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  // 1000mを超えたら、その時点の人数(n)の平方根の10倍に難易度倍率を切り替える(それまでは70倍)
-  function difficultyMultiplier(){ return distance > 1000 ? 10*Math.sqrt(crowdCount) : 70; }
+  // 1000mを超えたら、その時点の人数(n)の平方根の100000倍に難易度倍率を切り替える(それまでは70倍)
+  function difficultyMultiplier(){ return distance > 1000 ? 100000*Math.sqrt(crowdCount) : 70; }
   function difficultyFactor(){ return 1 + (distance/380)*difficultyMultiplier(); }
   // 障害物は距離が進むほどHPがより急激に上がるようにする(通常の難易度係数より急勾配+後半で加速)
   function obstacleDifficultyFactor(){
