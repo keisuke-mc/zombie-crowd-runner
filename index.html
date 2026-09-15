@@ -157,8 +157,8 @@
     font-family:'Roboto Mono',monospace; font-size:10px; letter-spacing:.1em; color:var(--footer-dim);
     pointer-events:none;
   }
-  .theme-toggle{
-    position:absolute; bottom:10px; right:14px; z-index:20;
+  .icon-toggle{
+    position:absolute; bottom:10px; z-index:20;
     width:34px; height:34px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-size:16px; line-height:1;
@@ -166,8 +166,10 @@
     cursor:pointer; pointer-events:auto;
     transition: transform .15s ease, filter .15s ease;
   }
-  .theme-toggle:hover{ filter:brightness(1.15); transform:scale(1.06); }
-  .theme-toggle:active{ transform:scale(.94); }
+  .icon-toggle:hover{ filter:brightness(1.15); transform:scale(1.06); }
+  .icon-toggle:active{ transform:scale(.94); }
+  #btn-theme{ right:14px; }
+  #btn-fullscreen{ right:56px; font-size:15px; }
 </style>
 </head>
 <body>
@@ -221,7 +223,8 @@
     </div>
 
     <div id="app-footer-hint">DRAG / ARROW KEYS TO MOVE</div>
-    <button id="btn-theme" class="theme-toggle" type="button" title="ライト/ダークモード切り替え">🌙</button>
+    <button id="btn-fullscreen" class="icon-toggle" type="button" title="全画面表示の切り替え">⛶</button>
+    <button id="btn-theme" class="icon-toggle" type="button" title="ライト/ダークモード切り替え">🌙</button>
   </div>
 </div>
 
@@ -276,6 +279,7 @@
   const finalDistanceEl = document.getElementById('final-distance');
   const finalPeakEl = document.getElementById('final-peak');
   const btnTheme = document.getElementById('btn-theme');
+  const btnFullscreen = document.getElementById('btn-fullscreen');
 
   /* =========================================================
      Three.js 基本セットアップ
@@ -830,6 +834,29 @@
 
   btnStart.addEventListener('click', startGame);
   btnRetry.addEventListener('click', startGame);
+
+  /* =========================================================
+     全画面表示
+  ========================================================= */
+  function isFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function updateFullscreenIcon(){
+    btnFullscreen.textContent = isFullscreen() ? '⤡' : '⛶';
+  }
+  function toggleFullscreen(){
+    if(!isFullscreen()){
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if(req) req.call(el);
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if(exit) exit.call(document);
+    }
+  }
+  btnFullscreen.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', updateFullscreenIcon);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
 
   /* =========================================================
      HUD更新
