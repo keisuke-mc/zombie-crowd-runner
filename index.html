@@ -565,9 +565,9 @@
   function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
   function randRange(min,max){ return Math.random()*(max-min)+min; }
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function difficultyFactor(){ return 1 + (distance/380)*10; }
+  function difficultyFactor(){ return 1 + (distance/380)*100; }
   // 障害物は距離が進むほどHPがより急激に上がるようにする(通常の難易度係数より急勾配+後半で加速)
-  function obstacleDifficultyFactor(){ return 1 + (distance/130)*10 + Math.pow(distance/700, 2)*10; }
+  function obstacleDifficultyFactor(){ return 1 + (distance/130)*100 + Math.pow(distance/700, 2)*100; }
 
   // ---- 演算ゲート ----
   function makeOp(positive){
