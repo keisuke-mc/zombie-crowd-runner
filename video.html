@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <title>MP4をHEVC(H.265)に変換するツール</title>
+    
+    <!-- ★ GitHub Pagesで動かすための「魔法のスクリプト」を追加しました -->
+    <script src="https://unpkg.com/coi-serviceworker@0.1.7/dist/coi-serviceworker.min.js"></script>
+
     <style>
         body { font-family: sans-serif; text-align: center; margin-top: 50px; }
         #status { font-weight: bold; color: #333; margin: 20px; }
     </style>
 </head>
 <body>
-    <script src="https://iwb.jp/s/js/tiny-console.js"></script>
     <h1>MP4動画をHEVC(H.265)に変換</h1>
     <p>変換したいMP4ファイルを選んでください</p>
     
@@ -26,7 +29,6 @@
     <a id="download-link" style="display:none; font-size: 18px; margin-top: 10px; display:inline-block;">変換された動画をダウンロード</a>
 
     <script type="module">
-        // ブラウザで直接インポートできるよう esm.sh を使用するように変更
         import { FFmpeg } from 'https://esm.sh/@ffmpeg/ffmpeg@0.12.10';
         import { fetchFile, toBlobURL } from 'https://esm.sh/@ffmpeg/util@0.12.1';
 
@@ -65,15 +67,11 @@
             status.textContent = '動画を処理中...（HEVC変換はパソコンに負荷がかかるため、少し時間がかかります）';
             uploader.setAttribute('disabled', 'true');
 
-            // 1. 選択されたファイルをffmpegの仮想ファイルシステムに書き込む
             await ffmpeg.writeFile('input.mp4', await fetchFile(file));
-
-            // 2. HEVC(H.265)に変換するコマンドを実行
             await ffmpeg.exec(['-i', 'input.mp4', '-c:v', 'libx265', '-c:a', 'copy', 'output.mp4']);
 
             status.textContent = '変換が完了しました！';
 
-            // 3. 変換されたファイルを取り出して画面に表示・ダウンロード可能にする
             const data = await ffmpeg.readFile('output.mp4');
             const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 
