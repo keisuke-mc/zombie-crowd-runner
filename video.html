@@ -4,12 +4,23 @@
     <meta charset="UTF-8">
     <title>MP4をHEVC(H.265)に変換するツール</title>
     
-    <!-- ★ GitHub Pagesで動かすための「魔法のスクリプト」を追加しました -->
+    <!-- GitHub Pages対応のスクリプト -->
     <script src="https://unpkg.com/coi-serviceworker@0.1.7/dist/coi-serviceworker.min.js"></script>
 
     <style>
         body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        #status { font-weight: bold; color: #333; margin: 20px; }
+        /* 状態がわかりやすいようにステータス表示のデザインを調整しました */
+        #status { 
+            font-weight: bold; 
+            color: #0056b3; 
+            margin: 20px auto; 
+            padding: 12px; 
+            background: #eef5ff; 
+            border-radius: 6px; 
+            display: inline-block; 
+            max-width: 90%; 
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -21,7 +32,7 @@
     <input type="file" id="uploader" accept="video/mp4" disabled>
     
     <!-- 進捗や状態を表示する場所 -->
-    <div id="status">システムをロード中です...（数秒かかります）</div>
+    <div id="status">システムを初期化中...</div>
 
     <br>
     <!-- 変換後の動画を表示・ダウンロードする場所 -->
@@ -43,18 +54,29 @@
         async function initFFmpeg() {
             ffmpeg = new FFmpeg();
             
+            // ★ ロード中の詳細なログを画面とコンソールに両方出すようにしました
             ffmpeg.on('log', ({ message }) => {
-                console.log(message);
+                console.log("[FFmpeg Log]:", message);
+                status.textContent = 'ロード中: ' + message;
             });
+
+            status.textContent = 'FFmpegのプログラムをダウンロード中...';
 
             const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-            await ffmpeg.load({
-                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-            });
+            
+            try {
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                });
 
-            status.textContent = '準備完了！変換したいMP4ファイルを選択してください。';
-            uploader.removeAttribute('disabled');
+                status.textContent = '準備完了！変換したいMP4ファイルを選択してください。';
+                uploader.removeAttribute('disabled');
+            } catch (err) {
+                // ★ 万が一エラーが起きたとき、画面にその内容を表示します
+                console.error("FFmpeg Load Error:", err);
+                status.textContent = 'エラー発生: ' + err.message;
+            }
         }
 
         // 初期化を実行
@@ -65,8 +87,14 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            status.textContent = '動画を処理中...（HEVC変換はパソコンに負荷がかかるため、少し時間がかかります）';
+            status.textContent = '動画を読み込んでいます...';
             uploader.setAttribute('disabled', 'true');
+
+            // ★ 変換中の進捗もパーセンテージで画面に表示します
+            ffmpeg.on('progress', ({ progress }) => {
+                const percent = Math.round(progress * 100);
+                status.textContent = `変換中... 進行度: ${percent}%`;
+            });
 
             await ffmpeg.writeFile('input.mp4', await fetchFile(file));
             await ffmpeg.exec(['-i', 'input.mp4', '-c:v', 'libx265', '-c:a', 'copy', 'output.mp4']);
