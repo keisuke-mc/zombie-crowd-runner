@@ -9,7 +9,6 @@
     </style>
 </head>
 <body>
-    <script src="https://iwb.jp/s/js/tiny-console.js"></script>
     <h1>MP4動画をHEVC(H.265)に変換</h1>
     <p>変換したいMP4ファイルを選んでください</p>
     
@@ -26,9 +25,9 @@
     <a id="download-link" style="display:none; font-size: 18px; margin-top: 10px; display:inline-block;">変換された動画をダウンロード</a>
 
     <script type="module">
-        // ffmpeg.wasmの読み込み
-        import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-        import { fetchFile, toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
+        // ブラウザで直接インポートできるよう esm.sh を使用するように変更
+        import { FFmpeg } from 'https://esm.sh/@ffmpeg/ffmpeg@0.12.10';
+        import { fetchFile, toBlobURL } from 'https://esm.sh/@ffmpeg/util@0.12.1';
 
         const status = document.getElementById('status');
         const uploader = document.getElementById('uploader');
@@ -44,7 +43,7 @@
                 console.log(message);
             });
 
-            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
             await ffmpeg.load({
                 coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                 wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -69,97 +68,6 @@
             await ffmpeg.writeFile('input.mp4', await fetchFile(file));
 
             // 2. HEVC(H.265)に変換するコマンドを実行
-            // -c:v libx265 が「HEVCに変換して」という命令です
-            await ffmpeg.exec(['-i', 'input.mp4', '-c:v', 'libx265', '-c:a', 'copy', 'output.mp4']);
-
-            status.textContent = '変換が完了しました！';
-
-            // 3. 変換されたファイルを取り出して画面に表示・ダウンロード可能にする
-            const data = await ffmpeg.readFile('output.mp4');
-            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
-
-            outputVideo.src = url;
-            outputVideo.style.display = 'block';
-
-            downloadLink.href = url;
-            downloadLink.download = 'output_hevc.mp4';
-            downloadLink.textContent = '💾 変換されたHEVC動画をダウンロード';
-            downloadLink.style.display = 'inline-block';
-        });
-    </script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>MP4をHEVC(H.265)に変換するツール</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        #status { font-weight: bold; color: #333; margin: 20px; }
-    </style>
-</head>
-<body>
-    <h1>MP4動画をHEVC(H.265)に変換</h1>
-    <p>変換したいMP4ファイルを選んでください</p>
-    
-    <!-- ファイルを選ぶボタン -->
-    <input type="file" id="uploader" accept="video/mp4" disabled>
-    
-    <!-- 進捗や状態を表示する場所 -->
-    <div id="status">システムをロード中です...（数秒かかります）</div>
-
-    <br>
-    <!-- 変換後の動画を表示・ダウンロードする場所 -->
-    <video id="output-video" controls width="400" style="display:none; margin-top: 20px;"></video>
-    <br>
-    <a id="download-link" style="display:none; font-size: 18px; margin-top: 10px; display:inline-block;">変換された動画をダウンロード</a>
-
-    <script type="module">
-        // ffmpeg.wasmの読み込み
-        import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
-        import { fetchFile, toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js';
-
-        const status = document.getElementById('status');
-        const uploader = document.getElementById('uploader');
-        const outputVideo = document.getElementById('output-video');
-        const downloadLink = document.getElementById('download-link');
-
-        let ffmpeg = null;
-
-        async function initFFmpeg() {
-            ffmpeg = new FFmpeg();
-            
-            ffmpeg.on('log', ({ message }) => {
-                console.log(message);
-            });
-
-            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-            await ffmpeg.load({
-                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-            });
-
-            status.textContent = '準備完了！変換したいMP4ファイルを選択してください。';
-            uploader.removeAttribute('disabled');
-        }
-
-        // 初期化を実行
-        initFFmpeg();
-
-        // ファイルが選択されたときの処理
-        uploader.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            status.textContent = '動画を処理中...（HEVC変換はパソコンに負荷がかかるため、少し時間がかかります）';
-            uploader.setAttribute('disabled', 'true');
-
-            // 1. 選択されたファイルをffmpegの仮想ファイルシステムに書き込む
-            await ffmpeg.writeFile('input.mp4', await fetchFile(file));
-
-            // 2. HEVC(H.265)に変換するコマンドを実行
-            // -c:v libx265 が「HEVCに変換して」という命令です
             await ffmpeg.exec(['-i', 'input.mp4', '-c:v', 'libx265', '-c:a', 'copy', 'output.mp4']);
 
             status.textContent = '変換が完了しました！';
